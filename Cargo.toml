@@ -1,0 +1,10 @@
+[package]
+name = "mariadb_migration"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+futures = "0.3.30"
+mysql_async = "0.34.2"
+tokio = { version = "1.40.0", features = ["full"] }
+clap = { version = "4.5.17", features = ["derive"] }

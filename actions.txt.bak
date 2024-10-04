@@ -1,0 +1,6 @@
+0 start 42 DoNotMigrate bar1
+0 end
+1 goto start
+1 goto end
+2 goto start
+2 goto end
