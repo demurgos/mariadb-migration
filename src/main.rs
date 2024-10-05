@@ -451,10 +451,25 @@ async fn set_is_migrated_if_revision(tx: &mut Transaction<'_>, shard_id: u32, sh
 
 async fn set_is_migrated(tx: &mut Transaction<'_>, shard_id: u32, default_shard_revision: u32) -> Result<(), Box<dyn Error>> {
   // language=mariadb
-  tx.exec_drop(r"insert into shard_meta(shard_id, revision, is_migrated) values (?, ?, true) on duplicate key update is_migrated = true;", vec![shard_id, default_shard_revision]).await?;
-  let affected = tx.affected_rows();
-  assert!(affected > 0);
-  Ok(())
+  let cur_meta = tx.exec_first::<(u32, bool), _, _>("select revision, is_migrated from shard_meta where shard_id = ?", vec![shard_id]).await?;
+  match cur_meta {
+    None => {
+      // language=mariadb
+      tx.exec_drop(r"insert into shard_meta(shard_id, revision, is_migrated) values (?, ?, true);", vec![Value::Int(shard_id.into()), Value::Int((default_shard_revision + 1).into())]).await?;
+      let affected = tx.affected_rows();
+      assert!(affected == 1);
+      Ok(())
+    }
+    Some((old_revision, _is_migrated)) => {
+      assert_eq!(old_revision, default_shard_revision);
+      let new_revision = old_revision + 1;
+      // language=mariadb
+      tx.exec_drop(r"update shard_meta set revision = ?, is_migrated = true where shard_id = ? and revision = ?;", vec![Value::Int(new_revision.into()), Value::Int(shard_id.into()), Value::Int(old_revision.into())]).await?;
+      let affected = tx.affected_rows();
+      assert!(affected == 1);
+      Ok(())
+    }
+  }
 }
 
 async fn set_shard_entry(tx: &mut Transaction<'_>, shard_id: u32, key: String, value: String) -> Result<(), Box<dyn Error>> {
